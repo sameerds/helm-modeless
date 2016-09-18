@@ -1,0 +1,37 @@
+* helm-modeless
+This package is an attempt at radically reinterpreting the
+operation of ~helm~, the coolest Emacs framework for incremental
+completion and narrowing selections. It allows a user to continue
+accessing candidates from the last ~helm~ session that are still
+cached in the ~helm-buffer~ created by that session.
+
+Example: Pressing ~M-g n~ after a successful ~helm-grep~ or
+~helm-occur~ session should take the user to the next candidate
+with no other interaction.
+
+One can think of a typical ~helm~ interaction as centering around a
+special buffer called the ~helm-buffer~, which contains the current
+set of possible candidates. A typical ~helm~ session is modal in
+nature --- the user's focus is trapped within the ~helm~ buffer while
+they execute commands to modify the set of candidates or perform
+persistent actions in them.
+
+There are two ways for a user to exit a ~helm~ session:
+1. Either quit the session and return to the ~helm-source-buffer~
+2. Or choose a candidate and perform an action on it that exits the
+   ~helm~ session.
+
+But the ~helm-buffer~ created for that session is still present,
+and can be used to start a new ~helm~ session using the command
+~helm-resume~. This package is an attempt to use that buffer to
+interact with the listed candidates without starting a new
+session. Hence the name ~helm-modeless~ --- the user's focus
+remains in their own buffer, and is not captured by a ~helm~ session.
+
+As a simple example, the plain ~grep~ and ~occur~ commands are
+modeless. When the user selects an occurence, the ~*grep*~ or
+~*occur*~ stays out of the way until it is recalled by
+~compilation-minor-mode~ commands ~next-error~ (~M-g n~) or
+~previous-error~ (~M-g n~). ~helm-modeless~ enables the same
+behaviour for ~helm~, by interacting with the last ~helm-buffer~
+without actually starting a ~helm~ session.
