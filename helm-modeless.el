@@ -99,7 +99,7 @@ Suitable for use as `next-error-function'"
           (helm-skip-noncandidate-line (cl-ecase arg
                                          (1 'next)
                                          (-1 'previous)))
-          (h-mark-current-line)
+          (helm-modeless-mark-current-line)
           (let ((candidate (buffer-substring (point-at-bol) (point-at-eol))))
             (helm-grep-action candidate)))
       (setq helm-buffer orig-helm-buffer))))
