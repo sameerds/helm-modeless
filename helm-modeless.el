@@ -1,16 +1,12 @@
-;;; helm.el --- Emacs incremental and narrowing framework -*- lexical-binding: t -*-
+;;; helm-modeless.el --- Bind next-error and previous-error in helm
 
-;; Copyright (C) 2016 Sameer Sahasrabuddhe <sameer@sbuddhe.net>
+;; Copyright (C) 2016-2017 Sameer Sahasrabuddhe
 
 ;; Author: Sameer Sahasrabuddhe <sameer@sbuddhe.net>
 ;; Created: 11 September 2016
-
-;; Homepage: http://github.com/sameerds/helm-modeless
-
 ;; Version: 0.1
-
 ;; Keywords: convenience matching
-
+;; Homepage: http://github.com/sameerds/helm-modeless
 ;; Package-Requires: ((helm "2.1.0"))
 
 ;; This file is not part of GNU Emacs.
@@ -69,56 +65,75 @@
 
 ;;; Code:
 
-;; FIXME: This should ideally be declared in `helm-grep.el'
-(defvar helm-modeless-grep-after-init-hook)
-
-;; FIXME: This will not be necessary if the `helm-grep' source was
-;; initialized with an appropriate hook.
-(defmethod helm-setup-user-source ((source helm-grep-class))
-  (setf (slot-value source 'after-init-hook) helm-modeless-grep-after-init-hook))
-
+
 (defun helm-modeless-mark-current-line ()
   "Like `helm-mark-current-line', but modeless!"
   (move-overlay helm-selection-overlay
                 (point-at-bol) (1+ (point-at-eol)))
   (setq helm-selection-point (overlay-start helm-selection-overlay)))
 
-(defun helm-modeless-grep-jump (arg rst)
-  "Modelessly move the current selection in the `helm-buffer'.
-Suitable for use as `next-error-function'"
+(defun helm-modeless-action (action arg rst)
+  "Modelessly move the current selection in a `helm' buffer and perform action."
   ;; TODO: Handle the `rst' argument.
   (interactive)
-  (let ((orig-helm-buffer helm-buffer))
-    (unwind-protect
-        (let ((helm-buffer (current-buffer)))
-          (funcall helm-display-function helm-buffer)
-          ;; If window is not dedicated, it sticks around after a
-          ;; successful exit from `helm-resume'.
-          (set-window-dedicated-p (get-buffer-window helm-buffer) t)
-          (forward-line arg)
-          (helm-skip-noncandidate-line (cl-ecase arg
-                                         (1 'next)
-                                         (-1 'previous)))
-          (helm-modeless-mark-current-line)
-          (let ((candidate (buffer-substring (point-at-bol) (point-at-eol))))
-            (helm-grep-action candidate)))
-      (setq helm-buffer orig-helm-buffer))))
-
-(defun helm-modeless-enable-compilation-minor-mode ()
-  (with-helm-buffer
-    (setq next-error-function 'helm-modeless-grep-jump)))
-
-(add-hook 'helm-modeless-grep-after-init-hook 'helm-modeless-enable-compilation-minor-mode)
+  (setq helm-buffer (current-buffer))
+  (with-selected-window (display-buffer (current-buffer))
+    (forward-line arg)
+    (helm-skip-noncandidate-line (cl-ecase arg
+                                   (1 'next)
+                                   (-1 'previous)))
+    (move-overlay helm-selection-overlay
+                  (point-at-bol) (1+ (point-at-eol)) (current-buffer))
+    (setq helm-selection-point (overlay-start helm-selection-overlay))
+    (let ((candidate (buffer-substring (point-at-bol) (point-at-eol))))
+      (funcall action candidate))))
 
 (defun helm-modeless-set-compilation-last-buffer ()
   "Register `helm-buffer' as the last known compilation buffer.
 But only if `helm-buffer' has suitable commands for `compilation-minor-mode'."
   (with-helm-buffer
-    (when (compilation-buffer-p (current-buffer))
-      (setq compilation-last-buffer (current-buffer)))))
+    (when (next-error-buffer-p (current-buffer))
+      (display-buffer (current-buffer))
+      (setq next-error-last-buffer (current-buffer)))))
 
 (add-hook 'helm-after-action-hook 'helm-modeless-set-compilation-last-buffer)
 
+
+;; Modeless actions for helm-grep
+;;
+;;
+
+;; FIXME: This will not be necessary if the `helm-grep' source was
+;; initialized with an appropriate hook.
+(defmethod helm-setup-user-source ((source helm-grep-class))
+  (setf (slot-value source 'after-init-hook)
+        (lambda ()
+          (with-helm-buffer
+            (setq next-error-function 'helm-modeless-grep-jump)))))
+
+(defun helm-modeless-grep-jump (arg rst)
+  "Modelessly perform grep action in the `*helm\ grep*' buffer.
+Suitable for use as `next-error-function'"
+  (helm-modeless-action 'helm-grep-other-window arg rst))
+
+
+;; Modeless actions for helm-occur
+;;
+;;
+
+;; FIXME: This will not be necessary if the `helm-occur' source was
+;; initialized with an appropriate hook.
+(defmethod helm-setup-user-source ((source helm-source-multi-occur))
+  (setf (slot-value source 'after-init-hook)
+        (lambda ()
+          (with-helm-buffer
+            (setq next-error-function 'helm-modeless-occur-jump)))))
+
+(defun helm-modeless-occur-jump (arg rst)
+  "Modelessly perform grep action in the `*helm\ occur*' buffer.
+Suitable for use as `next-error-function'"
+  (helm-modeless-action 'helm-moccur-goto-line-ow arg rst))
+
 (provide 'helm-modeless)
 
-;;; helm-modeless ends here
+;;; helm-modeless.el ends here
